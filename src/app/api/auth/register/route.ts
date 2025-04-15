@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       name,
       email,
       password,
+      role: 'user',
     });
 
     // Return success without exposing password
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
           id: user._id.toString(),
           name: user.name,
           email: user.email,
+          role: user.role,
         },
       },
       { status: 201 }

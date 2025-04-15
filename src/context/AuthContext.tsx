@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useSession, signIn, signOut, SessionContextValue } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 
 // Define the FAQ interface
 interface FAQ {
@@ -30,6 +31,7 @@ type User = {
   name: string;
   email: string;
   image?: string;
+  role: string;
   profile?: Profile;
 };
 
@@ -50,6 +52,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
 
   // Handle session changes
   useEffect(() => {
@@ -63,6 +66,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         name: session.user.name || '',
         email: session.user.email || '',
         image: session.user.image || undefined,
+        role: session.user.role as string,
         profile: (session.user).profile || {
           bio: '',
           travelPreferences: {
@@ -85,10 +89,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(true);
       setError(null);
       
+      // Get callbackUrl from URL if it exists
+      const callbackUrl = searchParams?.get('callbackUrl') || '/';
+      
       const result = await signIn('credentials', {
         redirect: false,
         email,
         password,
+        callbackUrl,
       });
 
       if (result?.error) {
@@ -96,7 +104,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
 
-      // Don't navigate here - let the session change trigger navigation via middleware
+      // If there's no callback URL, redirect based on role
+      if (!callbackUrl) {
+        const session = await fetch('/api/auth/session').then(res => res.json());
+        if (session?.user?.role === 'admin') {
+          window.location.href = '/admin';
+        } else {
+          window.location.href = '/';
+        }
+      }
     } catch (err) {
       setError('An unexpected error occurred');
       console.error(err);
@@ -151,8 +167,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
+      
+      // Get callbackUrl from URL if it exists
+      const callbackUrl = searchParams?.get('callbackUrl') || '/';
+      
       // For Google login, we need to use redirect
-      await signIn('google', { callbackUrl: '/' });
+      await signIn('google', { 
+        callbackUrl,
+        redirect: true 
+      });
     } catch (err) {
       setError('An unexpected error occurred');
       console.error(err);

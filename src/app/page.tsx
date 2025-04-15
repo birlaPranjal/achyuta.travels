@@ -1,16 +1,121 @@
 "use client"
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import HeroSection from '../components/home/HeroSection';
 import Navbar from '../components/common/Navbar';
 import PopularDestinations from '../components/home/PopularDestinations';
 import TrendingTrips from '../components/home/TrendingTrips';
 import Testimonials from '../components/home/Testimonials';
 import Footer from '../components/common/Footer';
-import { ArrowRight, Globe, Briefcase, HeartHandshake, Award } from 'lucide-react';
+import { ArrowRight, Globe, Briefcase, HeartHandshake, Award, Search, MapPin, Calendar, Users, Clock } from 'lucide-react';
 import Button from '../components/common/Button';
 import SearchBar from '../components/ui/SearchBar';
+import Image from 'next/image';
 
-const Index = () => {
+type Trip = {
+  _id: string;
+  title: string;
+  description: string;
+  price: number;
+  duration: string;
+  maxParticipants: number;
+  startDate: string;
+  endDate: string;
+  location: string;
+  category: string;
+  images: string[];
+  itinerary: string[];
+  included: string[];
+  excluded: string[];
+};
+
+type Category = {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+};
+
+const categories: Category[] = [
+  {
+    id: 'adventure',
+    name: 'Adventure Trips',
+    icon: '🏔️',
+    description: 'Thrilling experiences for adrenaline seekers'
+  },
+  {
+    id: 'cultural',
+    name: 'Cultural Tours',
+    icon: '🏛️',
+    description: 'Immerse yourself in local traditions and heritage'
+  },
+  {
+    id: 'nature',
+    name: 'Nature & Wildlife',
+    icon: '🌿',
+    description: 'Explore pristine landscapes and diverse wildlife'
+  },
+  {
+    id: 'beach',
+    name: 'Beach Getaways',
+    icon: '🏖️',
+    description: 'Relax and unwind by the sea'
+  }
+];
+
+const HomePage = () => {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTrips();
+  }, []);
+
+  const fetchTrips = async () => {
+    try {
+      const response = await fetch('/api/trips');
+      if (!response.ok) throw new Error('Failed to fetch trips');
+      const data = await response.json();
+      setTrips(data);
+    } catch (error) {
+      console.error('Error fetching trips:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load trips. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredTrips = trips.filter(trip => {
+    const matchesCategory = selectedCategory === 'all' || trip.category === selectedCategory;
+    const matchesSearch = trip.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         trip.location.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const handleBookNow = (tripId: string) => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please sign in to book a trip.',
+        variant: 'destructive',
+      });
+      router.push('/auth/signin');
+      return;
+    }
+    router.push(`/trips/${tripId}/checkout`);
+  };
+
   // Apply scroll animations
   useEffect(() => {
     const animateOnScroll = () => {
@@ -177,9 +282,87 @@ const Index = () => {
         </div>
       </section>
       
+      {/* Categories Section */}
+      <div className="py-16 px-4 bg-gray-50">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">Explore by Category</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className={`bg-white p-6 rounded-lg shadow-md cursor-pointer transition-all ${
+                  selectedCategory === category.id ? 'ring-2 ring-orange-500' : ''
+                }`}
+                onClick={() => setSelectedCategory(category.id)}
+              >
+                <div className="text-4xl mb-4">{category.icon}</div>
+                <h3 className="text-xl font-semibold mb-2">{category.name}</h3>
+                <p className="text-gray-600">{category.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Trips Section */}
+      <div className="py-16 px-4">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">Popular Trips</h2>
+          {isLoading ? (
+            <div className="flex justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredTrips.map((trip) => (
+                <div key={trip._id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                  <div className="relative h-48">
+                    <Image
+                      src={trip.images[0] || '/placeholder.jpg'}
+                      alt={trip.title}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="p-6">
+                    <h3 className="text-xl font-semibold mb-2">{trip.title}</h3>
+                    <div className="flex items-center text-gray-600 mb-4">
+                      <MapPin className="h-4 w-4 mr-1" />
+                      <span>{trip.location}</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center text-gray-600">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        <span>{trip.duration}</span>
+                      </div>
+                      <div className="flex items-center text-gray-600">
+                        <Users className="h-4 w-4 mr-1" />
+                        <span>Max {trip.maxParticipants}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-2xl font-bold text-orange-600">
+                        ${trip.price}
+                      </div>
+                      <button
+                        onClick={() => handleBookNow(trip._id)}
+                        className="flex items-center text-orange-600 hover:text-orange-700 font-medium"
+                      >
+                        Book Now
+                        <ArrowRight className="h-4 w-4 ml-1" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      
       <Footer />
     </div>
   );
 };
 
-export default Index;
+export default HomePage;

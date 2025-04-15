@@ -67,11 +67,44 @@ const SignIn = () => {
       return;
     }
     
-    await login(formData.email, formData.password);
+    const result = await login(formData.email, formData.password);
+    
+    // Get the callback URL from the search params
+    const searchParams = new URLSearchParams(window.location.search);
+    const callbackUrl = searchParams.get('callbackUrl');
+    
+    // If there's a callback URL, the middleware will handle the redirect
+    // Otherwise, we'll redirect based on the user's role
+    if (!callbackUrl) {
+      const user = await fetch('/api/auth/session').then(res => res.json());
+      if (user?.user?.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/');
+      }
+    }
   };
 
   const handleGoogleLogin = async () => {
-    await googleLogin();
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Get callbackUrl from URL if it exists
+      const searchParams = new URLSearchParams(window.location.search);
+      const callbackUrl = searchParams.get('callbackUrl');
+      
+      // For Google login, we need to use redirect
+      await googleLogin({ 
+        callbackUrl: callbackUrl || '/',
+        redirect: true 
+      });
+    } catch (err) {
+      setError('An unexpected error occurred');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

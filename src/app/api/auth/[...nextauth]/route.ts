@@ -12,6 +12,7 @@ type UserDocument = Document & {
   name: string;
   email: string;
   image?: string;
+  role: string;
   profile?: {
     bio?: string;
     travelPreferences?: {
@@ -69,6 +70,7 @@ export const authOptions: NextAuthOptions = {
           name: userDoc.name,
           email: userDoc.email,
           image: userDoc.image,
+          role: userDoc.role,
           profile: userDoc.profile,
         };
       },
@@ -83,9 +85,43 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async signIn({ user, account, profile }) {
+      // Only handle Google login
+      if (account?.provider === 'google' && user?.email) {
+        try {
+          await dbConnect();
+          
+          // Check if user already exists
+          let dbUser = await User.findOne({ email: user.email });
+          
+          if (!dbUser) {
+            // Create a new user if they don't exist
+            dbUser = await User.create({
+              name: user.name,
+              email: user.email,
+              role: 'user', // Set default role for new users
+            });
+          }
+          
+          // Ensure user has a role
+          if (!dbUser.role) {
+            dbUser.role = 'user';
+            await dbUser.save();
+          }
+          
+          // Copy the database role to the user object
+          user.role = dbUser.role;
+        } catch (error) {
+          console.error('Error in signIn callback:', error);
+          return false;
+        }
+      }
+      return true;
+    },
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;
+        token.role = user.role;
         token.profile = user.profile;
       }
       return token;
@@ -93,7 +129,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        // Use proper typing from the next-auth.d.ts file
+        session.user.role = token.role as string;
         session.user.profile = token.profile;
       }
       return session;
