@@ -89,7 +89,7 @@ const HomePage = () => {
       toast({
         title: 'Error',
         description: 'Failed to load trips. Please try again.',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setIsLoading(false);
@@ -108,7 +108,7 @@ const HomePage = () => {
       toast({
         title: 'Authentication Required',
         description: 'Please sign in to book a trip.',
-        variant: 'destructive',
+        variant: 'error',
       });
       router.push('/auth/signin');
       return;
